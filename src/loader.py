@@ -1,6 +1,44 @@
 import pandas as pd
 from pathlib import Path
 
+SAMSUNG_CARD_SHEETS = ["일시불", "연회비-기타수수료"]
+
+
+def load_samsung_card(file_path: str) -> pd.DataFrame:
+    """삼성카드 청구서 엑셀을 로드한다. 사용처 컬럼이 있으면 category로 사용한다."""
+    xl = pd.ExcelFile(file_path, engine="openpyxl")
+    frames = []
+
+    for sheet in SAMSUNG_CARD_SHEETS:
+        if sheet not in xl.sheet_names:
+            continue
+        df = xl.parse(sheet, header=1)
+        df = df.rename(columns={"이용일": "date", "가맹점": "description", "원금": "amount"})
+
+        if "date" not in df.columns or "amount" not in df.columns:
+            continue
+
+        # 합계/빈 행 제거: 이용일이 8자리 숫자인 행만 유지
+        df = df[df["date"].notna() & df["date"].astype(str).str.fullmatch(r"\d{8}")]
+
+        df["category"] = df["사용처"].fillna("미분류") if "사용처" in df.columns else "미분류"
+        df = df[["date", "description", "amount", "category"]].copy()
+        frames.append(df)
+
+    result = (
+        pd.concat(frames, ignore_index=True)
+        if frames
+        else pd.DataFrame(columns=["date", "description", "amount", "category"])
+    )
+    result["date"] = pd.to_datetime(result["date"].astype(str), format="%Y%m%d", errors="coerce")
+    result["amount"] = pd.to_numeric(result["amount"], errors="coerce").fillna(0)
+    return result
+
+
+def is_samsung_card_file(file_path: str) -> bool:
+    xl = pd.ExcelFile(file_path, engine="openpyxl")
+    return any(s in xl.sheet_names for s in SAMSUNG_CARD_SHEETS)
+
 
 def load_file(file_path: str) -> pd.DataFrame:
     path = Path(file_path)

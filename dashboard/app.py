@@ -6,7 +6,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 import pandas as pd
 import streamlit as st
 
-from src.loader import load_file, normalize_columns
+from src.loader import load_file, normalize_columns, load_samsung_card, is_samsung_card_file
 from src.categorizer import get_categories, assign_category
 from src.analyzer import monthly_summary, category_summary, monthly_category_pivot
 from src.storage import save_records, load_all_records, clear_all
@@ -28,8 +28,12 @@ with st.sidebar:
             tmp_path = tmp.name
 
         try:
-            df_new = load_file(tmp_path)
-            df_new = normalize_columns(df_new)
+            if suffix == ".xlsx" and is_samsung_card_file(tmp_path):
+                df_new = load_samsung_card(tmp_path)
+                st.info("삼성카드 청구서 형식으로 읽었습니다.")
+            else:
+                df_new = load_file(tmp_path)
+                df_new = normalize_columns(df_new)
             df_new = assign_category(df_new)
             st.success(f"{len(df_new)}건 로드됨")
             st.session_state["df_new"] = df_new
